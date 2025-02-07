@@ -4,6 +4,7 @@ import json
 from main_menu import Ship, Part
 from datetime import datetime
 from PIL import Image, ImageTk
+import random
 
 class ShipManagementGUI:
     def __init__(self, root, ship):
@@ -94,6 +95,18 @@ class ShipManagementGUI:
         right_panel = ttk.Frame(self.main_container, padding="10")
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5, 0))
         
+        # Storm Event Section
+        storm_frame = ttk.LabelFrame(right_panel, text="Weather Event", padding="10")
+        storm_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Button(
+            storm_frame,
+            text="🌊 Simulate Storm",
+            style='warning.TButton',
+            command=self.simulate_storm
+        ).pack(fill=tk.X)
+        
+        # Add New Part Section
         add_frame = ttk.LabelFrame(right_panel, text="Add New Part", padding="10")
         add_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -175,7 +188,6 @@ class ShipManagementGUI:
             command=self.replace_part
         ).pack(fill=tk.X)
         
-        # History Button
         ttk.Button(
             right_panel, 
             text="View History",
@@ -189,11 +201,24 @@ class ShipManagementGUI:
     def update_ship_display(self):
         self.ship_display.delete(1.0, tk.END)
         display_text = "Current Ship State:\n\n"
+        
+        
+        critical_parts = []
+        
         for part_name, part in self.ship._Ship__parts.items():
             display_text += f"{part}\n"
+            if part.needs_replacement():
+                critical_parts.append(part_name)
+        
+        # Warning message
+        if critical_parts:
+            display_text += "\n⚠️ WARNING ⚠️\n"
+            display_text += "The following parts need immediate replacement:\n"
+            for part in critical_parts:
+                display_text += f"- {part}\n"
+        
         self.ship_display.insert(tk.END, display_text)
         
-        # Configure tags for better visibility
         self.ship_display.tag_configure("center", justify='center')
         self.ship_display.tag_add("center", "1.0", "end")
         
@@ -215,7 +240,6 @@ class ShipManagementGUI:
             })
             self.show_error(error_msg)
         finally:
-            # Clear input fields regardless of success or failure
             self.part_name_var.set("")
             self.material_var.set("")
             
@@ -324,16 +348,13 @@ class ShipManagementGUI:
         )
         error_label.pack(fill=tk.X, pady=5)
         
-        # Auto-remove message after 5 seconds (5000 milliseconds)
-        self.root.after(5000, error_label.destroy)
+        self.root.after(4000, error_label.destroy)
 
     def show_success(self, message):
-        # Remove any existing success messages
         for widget in self.message_frame.winfo_children():
             if isinstance(widget, ttk.Label) and widget.cget("style") == "success.TLabel":
                 widget.destroy()
                 
-        # Create new success message
         success_label = ttk.Label(
             self.message_frame,  
             text=message,
@@ -397,7 +418,6 @@ class ShipManagementGUI:
             })
             self.show_error(error_msg)
         finally:
-            # Clear input fields
             self.new_part_var.set("")
             self.new_material_var.set("")
 
@@ -447,8 +467,83 @@ class ShipManagementGUI:
             })
             self.show_error(error_msg)
         finally:
-            # Clear input field
             self.delete_part_var.set("")
+
+    def simulate_storm(self):
+        """Simulate a storm that damages all parts"""
+        try:
+            damage_report = []
+            
+            # Apply damage randomly (10 - 30 per cent)
+            for part_name, part in self.ship._Ship__parts.items():
+                storm_damage = random.randint(10, 30)
+                old_usury = part.usury
+                
+                # Calculate new usury
+                part.usury = min(100, part.usury + storm_damage)
+                
+                damage_report.append({
+                    'part_name': part_name,
+                    'old_usury': old_usury,
+                    'damage': storm_damage,
+                    'new_usury': part.usury
+                })
+            
+            report_text = "Storm Damage Report:\n"
+            critical_parts = []
+            
+            for damage in damage_report:
+                report_text += f"\n{damage['part_name']}:\n"
+                report_text += f"  Damage taken: {damage['damage']}%\n"
+                report_text += f"  Usury: {damage['old_usury']}% → {damage['new_usury']}%\n"
+                
+                if damage['new_usury'] > 80:
+                    critical_parts.append(damage['part_name'])
+            
+            # Warning about parts in critical state
+            if critical_parts:
+                report_text += "\n⚠️ CRITICAL WARNING ⚠️\n"
+                report_text += "The following parts need immediate replacement:\n"
+                for part in critical_parts:
+                    report_text += f"- {part}\n"
+            
+            # Add storm event to history
+            self.ship.add_to_history('storm_event', {
+                'damage_report': damage_report,
+                'critical_parts': critical_parts
+            })
+            
+            # Storm report 
+            storm_window = tk.Toplevel(self.root)
+            storm_window.title("Storm Event")
+            storm_window.geometry("400x500")
+            
+            report_text_widget = tk.Text(
+                storm_window,
+                wrap=tk.WORD,
+                font=('Courier', 11),
+                padx=10,
+                pady=10
+            )
+            report_text_widget.pack(fill=tk.BOTH, expand=True)
+            report_text_widget.insert(tk.END, report_text)
+            report_text_widget.config(state='disabled')
+            
+            self.update_ship_display()
+            
+            # Warning message for parts in critical state
+            if critical_parts:
+                self.show_error("Storm caused critical damage! Some parts need immediate replacement!")
+            else:
+                self.show_success("Ship weathered the storm with manageable damage.")
+                
+        except Exception as e:
+            error_msg = f"Error during storm simulation: {str(e)}"
+            self.ship.add_to_history('error', {
+                'action': 'storm_event',
+                'error': error_msg
+            })
+            self.show_error(error_msg)
 
 def main():
     hull = Part("Hull", "Steel")

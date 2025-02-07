@@ -104,7 +104,44 @@ class ShipManagementGUI:
         right_panel = ttk.Frame(self.main_container, padding="10")
         right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, padx=(5, 0))
         
-        # Material Change Section
+        # Add New Part Section
+        add_frame = ttk.LabelFrame(right_panel, text="Add New Part", padding="10")
+        add_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(add_frame, text="New Part Name:").pack(fill=tk.X)
+        self.new_part_var = tk.StringVar()
+        self.new_part_entry = ttk.Entry(add_frame, textvariable=self.new_part_var)
+        self.new_part_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(add_frame, text="Part Material:").pack(fill=tk.X)
+        self.new_material_var = tk.StringVar()
+        self.new_material_entry = ttk.Entry(add_frame, textvariable=self.new_material_var)
+        self.new_material_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Button(
+            add_frame, 
+            text="Add Part",
+            style='primary.TButton',
+            command=self.add_part
+        ).pack(fill=tk.X)
+        
+        # Delete Part Section
+        delete_frame = ttk.LabelFrame(right_panel, text="Delete Part", padding="10")
+        delete_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Label(delete_frame, text="Part Name:").pack(fill=tk.X)
+        self.delete_part_var = tk.StringVar()
+        self.delete_part_entry = ttk.Entry(delete_frame, textvariable=self.delete_part_var)
+        self.delete_part_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Button(
+            delete_frame, 
+            text="Delete Part",
+            style='danger.TButton',
+            command=self.delete_part
+        ).pack(fill=tk.X)
+        
+        # Existing Material Change Section
         material_frame = ttk.LabelFrame(right_panel, text="Change Material", padding="10")
         material_frame.pack(fill=tk.X, pady=(0, 10))
         
@@ -325,6 +362,113 @@ class ShipManagementGUI:
         
         # Auto-remove message after 5 seconds (5000 milliseconds)
         self.root.after(5000, success_label.destroy)
+
+    def add_part(self):
+        part_name = self.new_part_var.get()
+        material = self.new_material_var.get()
+        
+        # Input validation
+        if not all([part_name, material]):
+            error_msg = "Failed to add part: Please fill in all fields!"
+            self.ship.add_to_history('error', {
+                'action': 'add_part',
+                'attempted_values': {
+                    'part_name': part_name,
+                    'material': material
+                },
+                'error': error_msg
+            })
+            self.show_error(error_msg)
+            # Clear input fields
+            self.new_part_var.set("")
+            self.new_material_var.set("")
+            return
+            
+        try:
+            new_part = Part(part_name, material)
+            if part_name in self.ship._Ship__parts:
+                error_msg = f"Failed to add part: Part '{part_name}' already exists!"
+                self.ship.add_to_history('error', {
+                    'action': 'add_part',
+                    'attempted_values': {
+                        'part_name': part_name,
+                        'material': material
+                    },
+                    'error': error_msg
+                })
+                self.show_error(error_msg)
+            else:
+                self.ship._Ship__parts[part_name] = new_part
+                self.ship.add_to_history('add_part', {
+                    'part_name': part_name,
+                    'material': material
+                })
+                self.update_ship_display()
+                self.show_success(f"Added new part: {new_part}")
+        except Exception as e:
+            error_msg = f"Failed to add part: {str(e)}"
+            self.ship.add_to_history('error', {
+                'action': 'add_part',
+                'attempted_values': {
+                    'part_name': part_name,
+                    'material': material
+                },
+                'error': error_msg
+            })
+            self.show_error(error_msg)
+        finally:
+            # Clear input fields
+            self.new_part_var.set("")
+            self.new_material_var.set("")
+
+    def delete_part(self):
+        part_name = self.delete_part_var.get()
+        
+        if not part_name:
+            error_msg = "Failed to delete part: Please provide a part name!"
+            self.ship.add_to_history('error', {
+                'action': 'delete_part',
+                'attempted_values': {
+                    'part_name': part_name
+                },
+                'error': error_msg
+            })
+            self.show_error(error_msg)
+            self.delete_part_var.set("")
+            return
+            
+        try:
+            if part_name not in self.ship._Ship__parts:
+                error_msg = f"Failed to delete part: Part '{part_name}' not found!"
+                self.ship.add_to_history('error', {
+                    'action': 'delete_part',
+                    'attempted_values': {
+                        'part_name': part_name
+                    },
+                    'error': error_msg
+                })
+                self.show_error(error_msg)
+            else:
+                deleted_part = self.ship._Ship__parts.pop(part_name)
+                self.ship.add_to_history('delete_part', {
+                    'part_name': part_name,
+                    'deleted_part': str(deleted_part)
+                })
+                self.update_ship_display()
+                self.show_success(f"Deleted part: {deleted_part}")
+        except Exception as e:
+            error_msg = f"Failed to delete part: {str(e)}"
+            self.ship.add_to_history('error', {
+                'action': 'delete_part',
+                'attempted_values': {
+                    'part_name': part_name
+                },
+                'error': error_msg
+            })
+            self.show_error(error_msg)
+        finally:
+            # Clear input field
+            self.delete_part_var.set("")
 
 def main():
     # Create initial ship
